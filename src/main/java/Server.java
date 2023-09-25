@@ -12,15 +12,21 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 
-
 public class Server {
+    public final int numThreads;
+    public static final int Port = 9999;
     public final List<String> validPaths = List.of("/index.html", "/spring.svg", "/spring.png",
             "/resources.html", "/styles.css", "/app.js", "/links.html", "/forms.html",
             "/classic.html", "/events.html", "/events.js");
 
+    public Server(int numThreads) {
+        this.numThreads = numThreads;
+    }
+
     public void start() {
-        ExecutorService service = Executors.newFixedThreadPool(64);
-        try (final var serverSocket = new ServerSocket(9999)) {
+
+        ExecutorService service = Executors.newFixedThreadPool(numThreads);
+        try (var serverSocket = new ServerSocket(Port)) {
             while (true) {
                 final var socket = serverSocket.accept();
                 service.submit(() -> {
@@ -33,7 +39,7 @@ public class Server {
         }
     }
 
-    public Runnable logic(Socket socket) {
+    public void logic(Socket socket) {
         try (final var in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
              final var out = new BufferedOutputStream(socket.getOutputStream())) {
 
@@ -41,7 +47,7 @@ public class Server {
                 final var requestLine = in.readLine();
                 final var parts = requestLine.split(" ");
 
-                if (parts.length !=3) {
+                if (parts.length != 3) {
                     continue;
                 }
                 final var path = parts[1];
@@ -52,13 +58,11 @@ public class Server {
                 final var filePath = Path.of(".", "public", path);
                 final var mimeType = Files.probeContentType(filePath);
 
-                if(path.equals("/classic.html")) {
+                if (path.equals("/classic.html")) {
                     forClassic(filePath, mimeType, out);
-                    continue;
+                } else {
+                    isOk(mimeType, Files.size(filePath), filePath, out);
                 }
-
-                final var lenght = Files.size(filePath);
-                isOk(mimeType, lenght, filePath, out);
 
             }
         } catch (IOException e) {
@@ -75,7 +79,7 @@ public class Server {
                             "Content-lenght: 0\r\n" +
                             "Connection: close\r\n" +
                             "\r\n"
-                    ).getBytes());
+            ).getBytes());
             out.flush();
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -95,7 +99,7 @@ public class Server {
                             "Content-Length: " + content.length + "\r\n" +
                             "Connection: close\r\n" +
                             "\r\n"
-                    ).getBytes());
+            ).getBytes());
             out.write(content);
             out.flush();
         } catch (IOException e) {
